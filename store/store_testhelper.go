@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"fmt"
+	"io"
 	"math/rand"
 	"os"
 	"strings"
@@ -87,14 +88,41 @@ func (h *TestHelper) Cleanup() {
 	// TODO - Add code that cleans the bucket by removing files
 }
 
+func (h *TestHelper) VerifyDirectory(objectName string) bool {
+	if !strings.HasSuffix(objectName, "/") {
+		objectName += "/"
+	}
+	return h.VerifyFile(objectName)
+}
+
 func (h *TestHelper) VerifyFile(objectName string) bool {
 	obj := h.Client.Bucket(h.BucketName).Object(objectName)
 	_, err := obj.Attrs(h.Context)
 	if err != nil {
-		if err == storage.ErrObjectNotExist {
+		// Check for object not exist errors more broadly
+		if err == storage.ErrObjectNotExist || strings.Contains(err.Error(), "object doesn't exist") || strings.Contains(err.Error(), "notFound") {
 			return false
 		}
 		h.t.Fatalf("Failed to get object attributes for %q: %v", objectName, err)
 	}
 	return true
+}
+
+func (h *TestHelper) VerifyFileContents(objectName string, expectedContents string) bool {
+	// https://cloud.google.com/go/docs/reference/cloud.google.com/go/storage/latest#cloud_google_com_go_storage_ObjectHandle_NewReader
+
+	rc, err := h.Client.Bucket(h.BucketName).Object(objectName).NewReader(h.Context)
+	if err != nil {
+		h.t.Fatalf("Failed to create reader for %q: %v", objectName, err)
+		return false
+	}
+
+	slurp, err := io.ReadAll(rc)
+	rc.Close()
+	if err != nil {
+		h.t.Fatalf("Failed to read contents of %q: %v", objectName, err)
+		return false
+	}
+
+	return string(slurp) == expectedContents
 }

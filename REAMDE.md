@@ -14,3 +14,5 @@ For tests, we can implement a fake store:
 https://github.com/fsouza/fake-gcs-server
 
 
+Code samples:
+https://cloud.google.com/storage/docs/samples/storage-configure-retries
